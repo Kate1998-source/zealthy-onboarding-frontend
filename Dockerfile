@@ -16,8 +16,7 @@ COPY . .
 # Build the React app
 RUN npm run build
 
-# Install serve globally
-RUN npm install -g serve
+
 
 # Expose port
 EXPOSE $PORT
