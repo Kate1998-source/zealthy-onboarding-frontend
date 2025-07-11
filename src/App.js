@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { getAdminConfig } from './api';
+import { getAdminConfig, registerCompleteUser, checkEmailExists } from './api';
 import AboutMeComponent from './components/form-components/AboutMeComponent';
 import AddressComponent from './components/form-components/AddressComponent';
 import BirthdateComponent from './components/form-components/BirthdateComponent';
@@ -20,12 +20,12 @@ function OnboardingWizard() {
     restoreProgress();
   }, []);
 
-  // Auto-save progress whenever userData changes (ISSUE 3 FIX)
+  // Auto-save progress
   useEffect(() => {
     if (userData.email && currentStep > 1) {
       localStorage.setItem('zealthy_user_data', JSON.stringify(userData));
       localStorage.setItem('zealthy_current_step', currentStep.toString());
-      console.log('Auto-saved progress:', userData, 'Step:', currentStep);
+      console.log('Progress saved:', currentStep);
     }
   }, [userData, currentStep]);
 
@@ -35,8 +35,7 @@ function OnboardingWizard() {
       setAdminConfig(config);
       console.log('Admin config loaded:', config);
     } catch (error) {
-      console.error('Failed to load admin config:', error);
-      // Set default config if API fails
+      console.error('Admin config failed:', error);
       setAdminConfig({
         2: ['ABOUT_ME', 'ADDRESS'],
         3: ['BIRTHDATE']
@@ -44,9 +43,8 @@ function OnboardingWizard() {
     }
   };
 
-  // ISSUE 3 FIX: Restore progress on page refresh
   const restoreProgress = () => {
-    console.log('Attempting to restore progress...');
+    console.log('Restoring progress...');
     
     const savedData = localStorage.getItem('zealthy_user_data');
     const savedStep = localStorage.getItem('zealthy_current_step');
@@ -57,44 +55,13 @@ function OnboardingWizard() {
         if (parsedData.email) {
           setUserData(parsedData);
           setCurrentStep(parseInt(savedStep));
-          console.log('Progress restored - Data:', parsedData, 'Step:', savedStep);
+          console.log('Progress restored - Step:', savedStep);
         }
       } catch (error) {
-        console.error('Error restoring progress:', error);
+        console.error('Restore error:', error);
         localStorage.removeItem('zealthy_user_data');
         localStorage.removeItem('zealthy_current_step');
       }
-    } else {
-      console.log('No saved progress found');
-    }
-  };
-
-  // ISSUE 1 FIX: Check if email exists in database
-  const checkEmailExists = async (email) => {
-    try {
-      console.log('Checking if email exists:', email);
-      const response = await fetch(`http://localhost:8080/api/users/email/${encodeURIComponent(email)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('Email check response status:', response.status);
-      
-      if (response.status === 200) {
-        console.log('Email exists in database');
-        return true;
-      } else if (response.status === 404) {
-        console.log('Email is available');
-        return false;
-      } else {
-        console.log('Unexpected response status:', response.status);
-        return false;
-      }
-    } catch (error) {
-      console.error('Error checking email:', error);
-      return false;
     }
   };
 
@@ -107,26 +74,22 @@ function OnboardingWizard() {
     const email = formData.get('email');
     const password = formData.get('password');
 
-    console.log('Step 1 form submitted - Email:', email);
+    console.log('Step 1 submit:', email);
 
     try {
-      // ISSUE 1: Check if email exists
       const emailExists = await checkEmailExists(email);
       if (emailExists) {
         setError('❌ This email is already registered. Please use a different email.');
-        setLoading(false);
         return;
       }
 
-      // Email is available, proceed to step 2
       const newUserData = { email, password };
       setUserData(newUserData);
       setCurrentStep(2);
-      
-      console.log('Moving to step 2 with data:', newUserData);
+      console.log('Moving to step 2');
       
     } catch (error) {
-      console.error('Step 1 submission error:', error);
+      console.error('Step 1 error:', error);
       setError('❌ Failed to validate email. Please try again.');
     } finally {
       setLoading(false);
@@ -134,31 +97,29 @@ function OnboardingWizard() {
   };
 
   const handleDataChange = (field, value) => {
-    console.log(`Field "${field}" changed to:`, value);
+    console.log(`Field "${field}" changed:`, value);
     const newUserData = { ...userData, [field]: value };
     setUserData(newUserData);
   };
 
   const handleNextStep = () => {
     if (currentStep === 2) {
-      console.log('Moving from step 2 to step 3');
+      console.log('Moving to step 3');
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      console.log('Completing registration from step 3');
+      console.log('Completing registration');
       handleCompleteRegistration();
     }
   };
 
-  // ISSUE 2 FIX: Complete registration with proper data saving
   const handleCompleteRegistration = async () => {
     setLoading(true);
     setError('');
 
-    console.log('Starting registration completion...');
-    console.log('Current userData:', userData);
+    console.log('Starting registration...');
+    console.log('User data:', userData);
 
     try {
-      // Prepare complete user data
       const completeUserData = {
         email: userData.email,
         password: userData.password,
@@ -170,42 +131,23 @@ function OnboardingWizard() {
         birthdate: userData.birthdate || null
       };
 
-      console.log('Sending complete user data to backend:', completeUserData);
+      console.log('Sending to backend:', completeUserData);
 
-      // ISSUE 2: Use the correct endpoint
-      const response = await fetch('http://localhost:8080/api/users/register-complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(completeUserData)
-      });
-
-      console.log('Registration response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Registration failed with error:', errorText);
-        throw new Error(`Registration failed: ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('Registration successful! Result:', result);
+      const result = await registerCompleteUser(completeUserData);
+      console.log('Registration successful:', result);
       
-      alert(`🎉 Registration Complete! User ID: ${result.id}. Check the data table to see your info.`);
+      alert(`🎉 Registration Complete! User ID: ${result.id}`);
       
-      // Clear all saved data and return to step 1
+      // Clear saved data
       localStorage.removeItem('zealthy_user_data');
       localStorage.removeItem('zealthy_current_step');
       setCurrentStep(1);
       setUserData({});
       setError('');
       
-      console.log('Registration flow completed, returned to step 1');
-      
     } catch (error) {
-      console.error('Registration completion error:', error);
-      setError('❌ Registration failed. Please try again.');
+      console.error('Registration error:', error);
+      setError(`❌ Registration failed: ${error.message || error}`);
     } finally {
       setLoading(false);
     }
@@ -218,14 +160,13 @@ function OnboardingWizard() {
       setCurrentStep(1);
       setUserData({});
       setError('');
-      console.log('Progress cleared by user');
     }
   };
 
   const renderComponents = (pageNumber) => {
     const components = adminConfig[pageNumber] || [];
     
-    // If no admin config, use defaults
+    // Default components if admin config is empty
     if (components.length === 0) {
       if (pageNumber === 2) {
         return [
@@ -307,7 +248,7 @@ function OnboardingWizard() {
           ))}
         </div>
 
-        {/* Debug Info */}
+        {/* Debug Info - Development Only */}
         {process.env.NODE_ENV === 'development' && (
           <div style={{ 
             backgroundColor: '#f0f0f0', 
@@ -317,7 +258,7 @@ function OnboardingWizard() {
             borderRadius: '5px'
           }}>
             <strong>Debug:</strong> Step {currentStep} | Email: {userData.email || 'None'} | 
-            Data keys: {Object.keys(userData).join(', ')}
+            Keys: {Object.keys(userData).join(', ')}
           </div>
         )}
 
@@ -357,7 +298,8 @@ function OnboardingWizard() {
                     padding: '12px', 
                     borderRadius: '5px', 
                     border: '1px solid #ccc',
-                    fontSize: '16px'
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -374,7 +316,8 @@ function OnboardingWizard() {
                     padding: '12px', 
                     borderRadius: '5px', 
                     border: '1px solid #ccc',
-                    fontSize: '16px'
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -435,7 +378,7 @@ function OnboardingWizard() {
           </div>
         )}
 
-        {/* Step 3: Dynamic Components */}
+        {/* Step 3: Final Step */}
         {currentStep === 3 && (
           <div className="step-content">
             <h2>Step 3: Final Step!</h2>

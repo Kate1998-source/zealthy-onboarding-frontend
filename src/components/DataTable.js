@@ -9,31 +9,30 @@ function DataTable() {
   useEffect(() => {
     loadUsers();
     
-    // Auto-refresh every 5 seconds
-    const interval = setInterval(loadUsers, 5000);
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(loadUsers, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  // ISSUE 4 FIX: Improved data loading with better error handling
   const loadUsers = async () => {
     try {
       console.log('DataTable: Loading users...');
-      setError(''); // Clear previous errors
+      setError('');
       
       const userData = await getAllUsers();
-      console.log('DataTable: Received users:', userData);
+      console.log('DataTable: Received data:', userData);
       
       if (Array.isArray(userData)) {
         setUsers(userData);
-        console.log('DataTable: Successfully loaded', userData.length, 'users');
+        console.log('DataTable: Loaded', userData.length, 'users');
       } else {
-        console.error('DataTable: Invalid data format received:', userData);
-        setError('Invalid data format received from server');
+        console.error('DataTable: Invalid data format:', userData);
+        setError('Invalid data format received');
         setUsers([]);
       }
     } catch (error) {
-      console.error('DataTable: Failed to load users:', error);
-      setError('Failed to load users: ' + (error.message || error));
+      console.error('DataTable: Load error:', error);
+      setError(`Failed to load users: ${error.message || error}`);
       setUsers([]);
     } finally {
       setLoading(false);
@@ -41,7 +40,7 @@ function DataTable() {
   };
 
   const handleRefresh = () => {
-    console.log('DataTable: Manual refresh triggered');
+    console.log('DataTable: Manual refresh');
     setLoading(true);
     loadUsers();
   };
@@ -49,7 +48,26 @@ function DataTable() {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
-      return new Date(dateString).toLocaleDateString();
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      return new Date(dateString).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     } catch (error) {
       return dateString;
     }
@@ -60,7 +78,9 @@ function DataTable() {
       <div style={{ 
         padding: '40px', 
         textAlign: 'center',
-        fontSize: '18px'
+        fontSize: '18px',
+        minHeight: '100vh',
+        backgroundColor: '#f5f7fa'
       }}>
         <div style={{ fontSize: '40px', marginBottom: '20px' }}>⏳</div>
         Loading user data...
@@ -97,7 +117,7 @@ function DataTable() {
           color: '#7f8c8d',
           marginBottom: '20px'
         }}>
-          Real-time view of all users in the database. Auto-refreshes every 5 seconds.
+          Real-time view of registered users. Auto-refreshes every 10 seconds.
         </p>
         
         <div style={{ 
@@ -236,7 +256,7 @@ function DataTable() {
                       <strong>{user.id || 'N/A'}</strong>
                     </td>
                     <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                      <strong>{user.email || 'N/A'}</strong>
+                      <strong style={{ color: '#007bff' }}>{user.email || 'N/A'}</strong>
                     </td>
                     <td style={{ 
                       padding: '12px', 
@@ -262,7 +282,7 @@ function DataTable() {
                       {formatDate(user.birthdate)}
                     </td>
                     <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                      {formatDate(user.createdAt)}
+                      {formatDateTime(user.createdAt)}
                     </td>
                   </tr>
                 ))}
@@ -271,76 +291,97 @@ function DataTable() {
           </div>
         ) : (
           <div style={{ 
-            padding: '40px',
+            padding: '60px 40px',
             textAlign: 'center',
             color: '#7f8c8d'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '20px' }}>📋</div>
-            <p style={{ fontSize: '18px', marginBottom: '10px' }}>
-              {error ? 'Error loading data' : 'No users found'}
-            </p>
-            <p style={{ fontSize: '14px' }}>
-              {error ? 'Check console for details' : 'Complete the onboarding flow to see user data here.'}
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>📋</div>
+            <h3 style={{ 
+              fontSize: '24px', 
+              marginBottom: '10px',
+              color: '#2c3e50'
+            }}>
+              {error ? 'Unable to Load Data' : 'No Users Found'}
+            </h3>
+            <p style={{ fontSize: '16px', marginBottom: '20px' }}>
+              {error 
+                ? 'There was an error loading user data. Please check your connection and try again.' 
+                : 'Complete the onboarding flow to see user data here.'
+              }
             </p>
             {error && (
               <button 
                 onClick={handleRefresh}
                 style={{
-                  marginTop: '20px',
-                  padding: '10px 20px',
+                  padding: '12px 24px',
                   backgroundColor: '#3498db',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
                 }}
               >
-                Try Again
+                🔄 Try Again
               </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Debug Info */}
+      {/* Debug Info - Development Only */}
       {process.env.NODE_ENV === 'development' && (
         <div style={{
           marginTop: '20px',
           padding: '15px',
           backgroundColor: '#f8f9fa',
-          borderRadius: '5px',
+          borderRadius: '8px',
           fontSize: '12px',
-          color: '#666'
+          color: '#666',
+          border: '1px solid #dee2e6'
         }}>
           <strong>Debug Info:</strong><br/>
           Users loaded: {users.length}<br/>
           Loading: {loading ? 'Yes' : 'No'}<br/>
           Error: {error || 'None'}<br/>
-          Last refresh: {new Date().toLocaleTimeString()}
+          Last refresh: {new Date().toLocaleTimeString()}<br/>
+          API URL: {process.env.REACT_APP_API_URL || 'localhost:8080/api'}
         </div>
       )}
 
       {/* Navigation */}
       <div style={{ 
-        marginTop: '30px', 
+        marginTop: '40px', 
         textAlign: 'center',
-        padding: '20px'
+        padding: '30px',
+        backgroundColor: 'white',
+        borderRadius: '15px',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
       }}>
         <nav>
           <a href="/" style={{ 
             color: '#3498db', 
             textDecoration: 'none',
-            fontSize: '16px',
+            fontSize: '18px',
             fontWeight: 'bold',
-            marginRight: '20px'
+            marginRight: '30px',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            backgroundColor: '#f8f9fa',
+            transition: 'all 0.3s ease'
           }}>
             ← Back to Onboarding
           </a>
           <a href="/admin" style={{ 
-            color: '#3498db', 
+            color: '#e74c3c', 
             textDecoration: 'none',
-            fontSize: '16px',
-            fontWeight: 'bold'
+            fontSize: '18px',
+            fontWeight: 'bold',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            backgroundColor: '#f8f9fa',
+            transition: 'all 0.3s ease'
           }}>
             🔧 Admin Dashboard →
           </a>
