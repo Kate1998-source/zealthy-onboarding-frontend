@@ -1,5 +1,11 @@
-[build]
-builder = "NIXPACKS"
+# Install Railway CLI
+npm install -g @railway/cli
 
-[deploy]
-startCommand = "npm run build && npm start"
+# Login to Railway
+railway login
+
+# In your frontend project directory
+railway link
+
+# Deploy directly
+railway up
